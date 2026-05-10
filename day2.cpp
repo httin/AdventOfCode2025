@@ -26,18 +26,34 @@ ll no_of_digits(ll n) {
     return count;
 }
 
-bool isInvalid(ll n) {
-    ll count = no_of_digits(n);
-    if (count % 2 == 1) return false;
-    ll half = count / 2;
-    ll tenX = 1;
-    while (half > 0) {
-        tenX = tenX * 10;
-        --half;
+vector<int> findDivisors(ll n) {
+    vector<int> divisors;
+    // Iterate from 1 up to the square root of number of digits of n
+    for (int i = 1; i * i <= no_of_digits(n); ++i) {
+        if (n % i == 0) {
+            divisors.push_back(i);
+            // Check if i and n/i are the same (e.g., for perfect squares)
+            if (i * i != n) {
+                // If not, add the other divisor n/i
+                divisors.push_back(n / i);
+            }
+        }
     }
-    ll firstHalf = n / tenX;
-    ll secondHalf = n % tenX;
-    return firstHalf == secondHalf;
+    std::sort(divisors.begin(), divisors.end());
+    return divisors;
+}
+
+bool isInvalid(ll n, int k) {
+    ll count = no_of_digits(n);
+    if (count % k != 0) return false;
+    ll tenX = 1;
+    for (int i = 0; i < count / k; i++) tenX *= 10;
+    ll first = n % tenX;
+    for (int i = 1; i < k; i++) {
+        n /= tenX;
+        if ((n % tenX) != first) return false;
+    }
+    return true;
 }
 
 int main() {
@@ -48,13 +64,23 @@ int main() {
     );
     vector<string> ranges = split(s, ',');
     ll res = 0;
+    bool part2 = true;
     for (auto& range : ranges ) {
         auto vrange = split(range, '-');
         ll from = stoll(vrange[0]);
         ll to = stoll(vrange[1]);
         for (ll i = from; i <= to; ++i) {
-            if (isInvalid(i))
-                res += i;
+            if (!part2) {
+                if (isInvalid(i, 2))
+                    res += i;
+            } else {
+                for (int k=2; k <= no_of_digits(i); ++k) {
+                    if (isInvalid(i, k)) {
+                        res += i;
+                        break;
+                    }
+                }
+            }
         }
         // cout << from << " " << to << endl;
     }
