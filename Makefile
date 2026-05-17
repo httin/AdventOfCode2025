@@ -1,11 +1,20 @@
 CXX := g++
 CXXFLAGS := -std=c++17 -O2
 
-.PHONY: FORCE clean
+.PHONY: FORCE clean create
 
 day%: day%.cpp FORCE
 	$(CXX) $(CXXFLAGS) -o $@ $<
 	./$@
+
+create:
+ifndef DAY
+	$(error Usage: make create DAY=<N>)
+endif
+	@if [ -f "day$(DAY).cpp" ]; then echo "day$(DAY).cpp already exists"; exit 1; fi
+	@sed 's/DAY_N/$(DAY)/g' template.cpp > day$(DAY).cpp
+	@touch day$(DAY).txt
+	@echo "Created day$(DAY).cpp and day$(DAY).txt"
 
 clean:
 	rm -f day1 day2 day3 day4 day5 day6 day7 day8 day9 day10 \

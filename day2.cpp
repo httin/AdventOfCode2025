@@ -82,7 +82,6 @@ int main() {
                 }
             }
         }
-        // cout << from << " " << to << endl;
     }
     cout << res << endl;
     return 0;
