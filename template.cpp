@@ -9,6 +9,8 @@ using ll = long long;
 
 int main() {
     ifstream file("dayDAY_N.txt");
+    assert(file.is_open());
+
     vector<string> lines;
     string line;
     while (getline(file, line)) lines.push_back(line);

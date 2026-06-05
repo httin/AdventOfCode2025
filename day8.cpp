@@ -32,6 +32,8 @@ public:
         iota(parent.begin(), parent.end(), 0);
     }
 
+    bool IsAllConnected() const { return numComponents_ == 1; }
+
     int Find(int u) {
         if (parent[u] != u)
             parent[u] = Find(parent[u]);
@@ -41,16 +43,12 @@ public:
     void Union(int u, int v) {
         int pu = Find(u), pv = Find(v);
         if (pu == pv) return;
-        if (rank_[pu] < rank_[pv]) swap(pu, pv);
+        if (rank_[pu] < rank_[pv]) swap(pu, pv); // make sure pu has higher rank
         parent[pv] = pu;
         size_[pu] += size_[pv];
         if (rank_[pu] == rank_[pv]) rank_[pu]++;
         numComponents_--;
     }
-
-    int Size(int u) { return size_[Find(u)]; }
-    int NumComponents() const { return numComponents_; }
-    bool IsAllConnected() const { return numComponents_ == 1; }
 
     // Returns one size per component (root nodes only).
     vector<int> ComponentSizes() const {
