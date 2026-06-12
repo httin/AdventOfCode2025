@@ -34,14 +34,14 @@ void logVec(const vector<T>& vec) {
 #endif
 
 struct CompressedAxis {
-    vector<int> starts;
-    vector<int> widths;
+    vector<int> starts;  // {0, 1, 2, 4, 5, 6, 9, 10}
+    vector<int> widths;  // {1, 1, 2, 1, 1, 3, 1,  1}
 
     CompressedAxis(vector<int> coordinates) {
-        sort(coordinates.begin(), coordinates.end());
-        coordinates.erase(unique(coordinates.begin(), coordinates.end()), coordinates.end());
-        coordinates.insert(coordinates.begin(), coordinates.front() - 1); // left padding
-        coordinates.push_back(coordinates.back() + 1); // right padding
+        sort(coordinates.begin(), coordinates.end()); // {1,1,4,4,4,5,5,9,9,9,9}
+        coordinates.erase(unique(coordinates.begin(), coordinates.end()), coordinates.end()); // {1,4,5,9}
+        coordinates.insert(coordinates.begin(), coordinates.front() - 1); // left padding {0,1,4,5,9}
+        coordinates.push_back(coordinates.back() + 1); // right padding {0,1,4,5,9,10}
         for (int i = 0; i + 1 < (int)coordinates.size(); i++) {
             starts.push_back(coordinates[i]);
             widths.push_back(1);
@@ -99,7 +99,7 @@ int main() {
     // maxY > 7 .........#X#..    .000000001110.    .111111110001.    .0369xxxxxxxx.
     //        8 ..............    .000000000000.    .111111111111.    .0369xxxxxxxx.
     //
-    // Cell compression
+    // Coordinate compression
     //       x  x  x
     //       ↓  ↓  ↓
     //     0123456789
@@ -110,7 +110,7 @@ int main() {
     //   4 ..X.....X.
     // y→5 ..X..#XX#.
     //   6 ..X..X....
-    //   7 ..X..#X#..
+    // y→7 ..X..#X#..
     // y→8 ..#XX#X#..
     //   9 ..........
     // At the gap x=3,4. No polygon vertical edge crosses this band. So every column in x=3,4 sees exactly the same
@@ -122,6 +122,7 @@ int main() {
     for (auto& [x, y] : redTiles) { xs.push_back(x); ys.push_back(y); }
     CompressedAxis xAxis(xs);
     CompressedAxis yAxis(ys);
+    // With ~500 distinct x and ~500 distinct y: W ≈ 1000, H ≈ 1000
     int W = xAxis.size(), H = yAxis.size();
 
     // Step 2: mark boundary in compressed space
@@ -132,11 +133,11 @@ int main() {
         auto [x2, y2] = redTiles[(i + 1) % n];
         assert(x1 == x2 || y1 == y2);
         if (x1 == x2) {
-            int cc = xAxis.compress(x1);
+            int cc = xAxis.compress(x1); // column use X axis
             for (int cr = yAxis.compress(min(y1, y2)); cr <= yAxis.compress(max(y1, y2)); cr++)
                 boundary[cr][cc] = true;
         } else {
-            int cr = yAxis.compress(y1);
+            int cr = yAxis.compress(y1); // row use Y axis
             for (int cc = xAxis.compress(min(x1, x2)); cc <= xAxis.compress(max(x1, x2)); cc++)
                 boundary[cr][cc] = true;
         }
@@ -180,9 +181,9 @@ int main() {
             int c2 = xAxis.compress(max(x1, x2));
             int r1 = yAxis.compress(min(y1, y2));
             int r2 = yAxis.compress(max(y1, y2));
-            ll area = Area(redTiles[i], redTiles[j]);
+            ll fullArea = Area(redTiles[i], redTiles[j]);
             ll tileArea = rectSum(r1, c1, r2, c2);
-            if (tileArea == area) maxArea2 = max(maxArea2, area);
+            if (tileArea == fullArea) maxArea2 = max(maxArea2, fullArea);
         }
     }
     cout << "Part 2: " << maxArea2 << "\n";

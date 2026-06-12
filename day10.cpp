@@ -1,5 +1,9 @@
+#include <algorithm>
 #include <cassert>
+#include <climits>
 #include <fstream>
+#include <functional>
+#include <numeric>
 #include <sstream>
 #include <iostream>
 #include <string>
@@ -7,6 +11,23 @@
 
 using namespace std;
 using ll = long long;
+
+// exact rational, always stored in lowest terms with denominator > 0
+struct Frac {
+    ll num, den;
+    Frac(ll n = 0, ll d = 1) {
+        if (d < 0) { n = -n; d = -d; }
+        ll g = gcd(n < 0 ? -n : n, d);
+        if (g == 0) g = 1;
+        num = n / g; den = d / g;
+    }
+    Frac operator+(const Frac& o) const { return Frac(num*o.den + o.num*den, den*o.den); }
+    Frac operator-(const Frac& o) const { return Frac(num*o.den - o.num*den, den*o.den); }
+    Frac operator*(const Frac& o) const { return Frac(num*o.num, den*o.den); }
+    Frac operator/(const Frac& o) const { return Frac(num*o.den, den*o.num); }
+    bool isZero() const { return num == 0; }
+    bool isInt()  const { return den == 1; }
+};
 
 struct Problem {
     string light;
@@ -66,10 +87,77 @@ int solve1(vector<Problem>& problems) {
     return res;
 }
 
-int solve2(const Problem& p) {
-    int best = INT_MAX;
-    vector<int> rem = p.joltage;
+// Minimize total presses to hit every counter's joltage exactly.
+// Model: x_b >= 0 = presses of button b; for each counter c, sum of x_b over
+// buttons touching c must equal joltage[c]. Minimize sum(x_b).
+// The equality system A*x = joltage has a low-dimensional solution space
+// (free dim = n - rank <= 3 here): row-reduce to express each basic button as
+// an affine function of the few free buttons, then enumerate the free ones.
+ll solve2(const Problem& p) {
+    int m = static_cast<int>(p.joltage.size());   // counters (rows)
+    int n = static_cast<int>(p.buttons.size());   // buttons  (cols)
 
+    // augmented matrix [A | joltage], rows = counters, cols = buttons
+    vector<vector<Frac>> M(m, vector<Frac>(n + 1, Frac(0)));
+    for (int c = 0; c < m; c++) M[c][n] = Frac(p.joltage[c]);
+    for (int b = 0; b < n; b++)
+        for (int c : p.buttons[b]) M[c][b] = Frac(1);
+
+    // Gauss-Jordan elimination -> reduced row echelon form
+    vector<bool> isPivot(n, false);
+    int rank = 0;
+    for (int col = 0; col < n && rank < m; col++) {
+        int sel = -1;
+        for (int r = rank; r < m; r++) if (!M[r][col].isZero()) { sel = r; break; }
+        if (sel < 0) continue;
+        swap(M[rank], M[sel]);
+        Frac pv = M[rank][col];
+        for (int j = 0; j <= n; j++) M[rank][j] = M[rank][j] / pv;
+        for (int r = 0; r < m; r++)
+            if (r != rank && !M[r][col].isZero()) {
+                Frac f = M[r][col];
+                for (int j = 0; j <= n; j++) M[r][j] = M[r][j] - f * M[rank][j];
+            }
+        isPivot[col] = true;
+        rank++;
+    }
+
+    // consistency: a zeroed-out row with nonzero RHS means no solution
+    for (int r = rank; r < m; r++)
+        if (!M[r][n].isZero()) return LLONG_MAX;
+
+    // free buttons + their upper bounds (a button can't be pressed more than the
+    // smallest joltage among counters it touches)
+    vector<int> freeCols, ub;
+    for (int c = 0; c < n; c++)
+        if (!isPivot[c]) {
+            freeCols.push_back(c);
+            int best = INT_MAX;
+            for (int cnt : p.buttons[c]) best = min(best, p.joltage[cnt]);
+            ub.push_back(best);
+        }
+
+    // enumerate free buttons; each pivot row r gives
+    //   x_pivot = M[r][n] - sum_{free fc} M[r][fc] * x_fc
+    ll best = LLONG_MAX;
+    vector<int> freeVal(freeCols.size());
+    function<void(int)> rec = [&](int k) {
+        if (k == static_cast<int>(freeCols.size())) {
+            ll total = 0;
+            for (int v : freeVal) total += v;
+            for (int r = 0; r < rank; r++) {
+                Frac v = M[r][n];
+                for (size_t i = 0; i < freeCols.size(); i++)
+                    v = v - M[r][freeCols[i]] * Frac(freeVal[i]);
+                if (!v.isInt() || v.num < 0) return;  // not a valid non-negative integer
+                total += v.num;
+            }
+            best = min(best, total);
+            return;
+        }
+        for (int v = 0; v <= ub[k]; v++) { freeVal[k] = v; rec(k + 1); }
+    };
+    rec(0);
     return best;
 }
 
@@ -127,8 +215,10 @@ int main() {
     // counter 1 is touched only by x1 and x5 → x1 + x5 = 5
     // counter 2 is touched by x2, x4, x4     → x2 + x3 + x4 = 4
     // counter 3 is touched by x0, x1, x4     → x0 + x1 + x3 = 7
-    // goal is to minimize x0+x1+x2+x3+x4+x5, let's call this `best`
+    // Matrix equation: A·x = joltage (counters × buttons, counters is 0/1 matrix, buttons is variables)
+    // goal is to minimize x0+x1+x2+x3+x4+x5, this is linear programming problem
     ll part2 = 0;
+    for (const auto& p : problems) part2 += solve2(p);
     cout << "Part 2: " << part2 << "\n";
 
     return 0;
